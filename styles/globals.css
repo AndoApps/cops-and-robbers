@@ -1,112 +1,64 @@
-import { useRouter } from 'next/router'
-import { useState } from 'react'
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export default function Home() {
-  const router = useRouter()
-  const [joinCode, setJoinCode] = useState('')
-  const [studentName, setStudentName] = useState('')
-  const [step, setStep] = useState('choose') // choose, join-student
-  const [error, setError] = useState('')
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-  const goTeacher = () => {
-    router.push('/teacher')
-  }
+html, body {
+  font-family: 'Georgia', serif;
+  background: #0a0a0f;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
 
-  const goStudent = () => {
-    setStep('join-student')
-  }
+@keyframes slotRoll {
+  0% { transform: translateY(-20px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 
-  const handleJoin = () => {
-    if (!studentName.trim()) { setError('Please enter your name'); return }
-    if (!joinCode.trim() || joinCode.trim().length < 4) { setError('Please enter a valid game code'); return }
-    router.push(`/student?code=${joinCode.trim().toUpperCase()}&name=${encodeURIComponent(studentName.trim())}`)
-  }
+@keyframes bounceIn {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.05); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a0a00 50%, #0a0a0f 100%)' }}>
-      
-      {/* Title */}
-      <div className="text-center mb-12">
-        <div className="text-6xl mb-4">🚔💰</div>
-        <h1 className="text-5xl font-bold tracking-widest mb-2" style={{ color: '#ef4444', textShadow: '0 0 30px #ef444466' }}>
-          COPS &amp; ROBBERS
-        </h1>
-        <p className="text-gray-500 tracking-widest text-sm">THE CLASSROOM GAME</p>
-      </div>
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
 
-      {step === 'choose' && (
-        <div className="flex flex-col gap-4 w-full max-w-xs animate-fade-in">
-          <button
-            onClick={goTeacher}
-            className="w-full py-4 rounded-xl text-lg font-bold tracking-widest transition-all duration-200 hover:scale-105"
-            style={{ background: '#1a1a2e', border: '2px solid #ef4444', color: '#ef4444' }}
-          >
-            👮 I&apos;M THE TEACHER
-          </button>
-          <button
-            onClick={goStudent}
-            className="w-full py-4 rounded-xl text-lg font-bold tracking-widest transition-all duration-200 hover:scale-105"
-            style={{ background: '#1a1a2e', border: '2px solid #fbbf24', color: '#fbbf24' }}
-          >
-            🦹 I&apos;M A STUDENT
-          </button>
-        </div>
-      )}
+@keyframes slideUp {
+  0% { transform: translateY(30px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
 
-      {step === 'join-student' && (
-        <div className="w-full max-w-xs animate-fade-in">
-          <div className="rounded-2xl p-6" style={{ background: '#111', border: '1px solid #333' }}>
-            <h2 className="text-xl font-bold tracking-wider mb-6 text-center" style={{ color: '#fbbf24' }}>JOIN GAME</h2>
-            
-            <div className="mb-4">
-              <label className="block text-xs tracking-widest text-gray-500 mb-2">YOUR NAME</label>
-              <input
-                type="text"
-                value={studentName}
-                onChange={e => setStudentName(e.target.value)}
-                placeholder="Enter your name..."
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-600 outline-none"
-                style={{ background: '#1a1a2e', border: '1px solid #374151' }}
-                maxLength={20}
-                onKeyDown={e => e.key === 'Enter' && handleJoin()}
-              />
-            </div>
+.animate-slot { animation: slotRoll 0.6s ease-out; }
+.animate-bounce-in { animation: bounceIn 0.8s ease-out; }
+.animate-fade-in { animation: fadeIn 0.5s ease-in; }
+.animate-slide-up { animation: slideUp 0.6s ease-out; }
 
-            <div className="mb-6">
-              <label className="block text-xs tracking-widest text-gray-500 mb-2">GAME CODE</label>
-              <input
-                type="text"
-                value={joinCode}
-                onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Enter code..."
-                className="w-full px-4 py-3 rounded-lg text-white placeholder-gray-600 outline-none text-2xl tracking-widest text-center font-bold"
-                style={{ background: '#1a1a2e', border: '1px solid #374151' }}
-                maxLength={6}
-                onKeyDown={e => e.key === 'Enter' && handleJoin()}
-              />
-            </div>
+.grid-cell { transition: all 0.3s ease; cursor: grab; user-select: none; }
+.grid-cell:active { cursor: grabbing; }
+.grid-cell.called { opacity: 0.25; cursor: not-allowed; filter: grayscale(100%); }
+.grid-cell.available { cursor: pointer; }
+.grid-cell.available:hover { transform: scale(1.05); box-shadow: 0 0 12px rgba(251, 191, 36, 0.6); }
 
-            {error && <p className="text-red-400 text-sm text-center mb-4">{error}</p>}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1a1a2e; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
 
-            <button
-              onClick={handleJoin}
-              className="w-full py-3 rounded-xl font-bold tracking-widest transition-all hover:scale-105"
-              style={{ background: '#ef4444', color: 'white' }}
-            >
-              JOIN 🚀
-            </button>
-
-            <button
-              onClick={() => setStep('choose')}
-              className="w-full py-2 mt-3 text-gray-600 text-sm tracking-wider hover:text-gray-400 transition-colors"
-            >
-              ← Back
-            </button>
-          </div>
-        </div>
-      )}
-
-      <p className="mt-12 text-gray-700 text-xs tracking-widest">© ANDOAPPS</p>
-    </div>
-  )
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fadeIn 0.2s ease-in;
 }
