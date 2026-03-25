@@ -1,4 +1,4 @@
-{
+json{
   "name": "cops-and-robbers",
   "version": "0.1.0",
   "private": true,
@@ -8,9 +8,9 @@
     "start": "next start"
   },
   "dependencies": {
-    "next": "14.2.30",
-    "react": "^18",
-    "react-dom": "^18",
+    "next": "15.2.4",
+    "react": "^19",
+    "react-dom": "^19",
     "@supabase/supabase-js": "^2.39.0",
     "uuid": "^9.0.0"
   },
