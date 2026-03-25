@@ -1,5 +1,4 @@
-Here's the full student.js — go to GitHub → pages/student.js → pencil ✏️ → select all → delete → paste this entire block:
-javascriptimport { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { COLS, ROWS, SYMBOLS, GRID_CONTENTS, formatDollars, shuffle } from '../lib/gameLogic'
