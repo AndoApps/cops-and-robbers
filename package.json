@@ -1,4 +1,4 @@
-json{
+{
   "name": "cops-and-robbers",
   "version": "0.1.0",
   "private": true,
@@ -20,3 +20,16 @@ json{
     "tailwindcss": "^3.3.0"
   }
 }
+
+Commit changes
+
+Also update next.config.js — click it → pencil ✏️ → replace with:
+javascript/** @type {import('next').NextConfig} */
+const nextConfig = {
+  reactStrictMode: false,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+}
+
+module.exports = nextConfig
