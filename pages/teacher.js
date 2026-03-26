@@ -240,9 +240,13 @@ export default function Teacher() {
   const handleDefenceResponse = async (response, responderId) => {
     if (defenceTimerRef.current) clearInterval(defenceTimerRef.current)
     setDefenceCountdown(null)
+
     const action = activeActionRef.current
     if (!action) return
-    const { used, type } = response
+
+    const used = response.used
+    const type = response.type
+
     await supabase.from('students').update({ defence_response: null }).eq('id', responderId)
 
     if (!used) {
@@ -494,22 +498,22 @@ export default function Teacher() {
       </div>
 
       <div className="grid gap-3" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-        <div className="rounded-xl p-3" style={{ background: '#111', border: '1px solid #333' }}>
-          <p className="text-xs text-gray-600 tracking-widest mb-2">GRID</p>
-          <div className="grid grid-cols-8 gap-1 mb-1">
+        <div className="rounded-xl p-2" style={{ background: '#111', border: '1px solid #333' }}>
+          <p className="text-xs text-gray-600 tracking-widest mb-1">GRID</p>
+          <div className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
             <div />
-            {COLS.map(c => <div key={c} className="text-center text-xs text-gray-500 font-bold">{c}</div>)}
+            {COLS.map(c => <div key={c} className="text-center text-gray-500 font-bold" style={{ fontSize: '9px' }}>{c}</div>)}
           </div>
           {ROWS.map(row => (
-            <div key={row} className="grid grid-cols-8 gap-1 mb-1">
-              <div className="text-xs text-gray-500 font-bold flex items-center justify-center">{row}</div>
+            <div key={row} className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
+              <div className="text-gray-500 font-bold flex items-center justify-center" style={{ fontSize: '9px' }}>{row}</div>
               {COLS.map(col => {
                 const ref = `${col}${row}`
                 const called = calledRefs.includes(ref)
                 const isCurrent = ref === currentRef
                 return (
                   <div key={ref} className="rounded flex items-center justify-center font-bold transition-all"
-                    style={{ aspectRatio: '1', background: isCurrent ? '#fbbf24' : called ? '#1a1a1a' : '#1a1a2e', color: isCurrent ? '#000' : called ? '#333' : '#666', border: isCurrent ? '2px solid #fbbf24' : '1px solid #222', fontSize: '10px' }}>
+                    style={{ aspectRatio: '1', background: isCurrent ? '#fbbf24' : called ? '#1a1a1a' : '#1a1a2e', color: isCurrent ? '#000' : called ? '#333' : '#666', border: isCurrent ? '2px solid #fbbf24' : '1px solid #222', fontSize: '8px' }}>
                     {ref}
                   </div>
                 )
