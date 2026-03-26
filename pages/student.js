@@ -10,7 +10,8 @@ export default function Student() {
   const [phase, setPhase] = useState('joining')
   const [gameId, setGameId] = useState(null)
   const [studentId, setStudentId] = useState(null)
-  const [grid, setGrid] = useState(null)
+  const [grid, setGrid] = useState(Array(49).fill(null))
+  const [tray, setTray] = useState([])
   const [calledRefs, setCalledRefs] = useState([])
   const [currentRef, setCurrentRef] = useState(null)
   const [pointsInPlay, setPointsInPlay] = useState(0)
@@ -19,14 +20,15 @@ export default function Student() {
   const [frameJob, setFrameJob] = useState(false)
   const [notification, setNotification] = useState(null)
   const [scoreAnimating, setScoreAnimating] = useState(false)
-  const [dragItem, setDragItem] = useState(null)
   const [isCuffed, setIsCuffed] = useState(false)
   const [canPickSquare, setCanPickSquare] = useState(false)
   const [myPlace, setMyPlace] = useState(null)
   const [myFinalScore, setMyFinalScore] = useState(null)
-  const [podiumVisible, setPodiumVisible] = useState(false)
+  const [podiumReveal, setPodiumReveal] = useState(0)
   const [podiumData, setPodiumData] = useState(null)
   const [leavePrompt, setLeavePrompt] = useState(false)
+  const [dragging, setDragging] = useState(null)
+
   const studentIdRef = useRef(null)
   const notificationTimer = useRef(null)
 
@@ -36,11 +38,8 @@ export default function Student() {
 
   const joinGame = async () => {
     const { data: game } = await supabase.from('games').select('*').eq('code', code).eq('phase', 'lobby').single()
-    if (!game) {
-      alert('Game not found or already started. Check your code!')
-      router.push('/')
-      return
-    }
+    if (!game) { alert('Game not found or already started. Check your code!'); router.push('/'); return }
+
     const { data: student } = await supabase.from('students').insert({
       game_id: game.id,
       name: decodeURIComponent(name),
@@ -53,19 +52,15 @@ export default function Student() {
       active: true,
       grid: null,
     }).select().single()
+
     if (!student) { alert('Could not join game'); return }
     setGameId(game.id)
     setStudentId(student.id)
     studentIdRef.current = student.id
     setPhase('setup')
-    initGrid()
+    setTray(shuffle([...GRID_CONTENTS]))
     subscribeToGame(game.id, student.id)
     subscribeToMyRecord(student.id)
-  }
-
-  const initGrid = () => {
-    const contents = shuffle([...GRID_CONTENTS])
-    setGrid(contents)
   }
 
   const subscribeToGame = (gid, sid) => {
@@ -75,9 +70,7 @@ export default function Student() {
         if (g.phase) setPhase(g.phase)
         if (g.called_refs) setCalledRefs(g.called_refs)
         if (g.current_ref) setCurrentRef(g.current_ref)
-        if (g.phase === 'ended' && g.final_scores) {
-          handleGameEnd(g.final_scores, sid)
-        }
+        if (g.phase === 'ended' && g.final_scores) handleGameEnd(g.final_scores, sid)
       })
       .subscribe()
   }
@@ -88,19 +81,14 @@ export default function Student() {
         const s = payload.new
         if (s.points_in_play !== undefined) {
           setPointsInPlay(prev => {
-            if (prev !== s.points_in_play) {
-              setScoreAnimating(true)
-              setTimeout(() => setScoreAnimating(false), 800)
-            }
+            if (prev !== s.points_in_play) { setScoreAnimating(true); setTimeout(() => setScoreAnimating(false), 800) }
             return s.points_in_play
           })
         }
         if (s.points_banked !== undefined) setPointsBanked(s.points_banked)
         if (s.bulletproof !== undefined) setBulletproof(s.bulletproof)
         if (s.frame_job !== undefined) setFrameJob(s.frame_job)
-        if (s.notification) {
-          handleNotification(s.notification, sid)
-        }
+        if (s.notification) handleNotification(s.notification, sid)
         if (s.leaving === false && leavePrompt) setLeavePrompt(false)
       })
       .subscribe()
@@ -131,31 +119,71 @@ export default function Student() {
     setMyFinalScore(myScore)
     setPodiumData(scores.slice(0, 3))
     setPhase('ended')
-    setTimeout(() => setPodiumVisible(true), 500)
+    setTimeout(() => setPodiumReveal(1), 2000)
+    setTimeout(() => setPodiumReveal(2), 5000)
+    setTimeout(() => setPodiumReveal(3), 9000)
   }
 
-  const handleDragStart = (idx) => {
+  const handleDragStartTray = (idx) => {
     if (isCuffed) return
-    setDragItem(idx)
+    setDragging({ source: 'tray', index: idx })
   }
 
-  const handleDrop = (idx) => {
-    if (isCuffed || dragItem === null || dragItem === idx) return
+  const handleDragStartGrid = (idx) => {
+    if (isCuffed || !grid[idx]) return
+    setDragging({ source: 'grid', index: idx })
+  }
+
+  const handleDropOnGrid = (targetIdx) => {
+    if (!dragging || isCuffed) return
     const newGrid = [...grid]
-    const temp = newGrid[dragItem]
-    newGrid[dragItem] = newGrid[idx]
-    newGrid[idx] = temp
+    const newTray = [...tray]
+
+    if (dragging.source === 'tray') {
+      const item = newTray[dragging.index]
+      if (newGrid[targetIdx]) {
+        newTray[dragging.index] = newGrid[targetIdx]
+      } else {
+        newTray.splice(dragging.index, 1)
+      }
+      newGrid[targetIdx] = item
+    } else if (dragging.source === 'grid') {
+      const temp = newGrid[targetIdx]
+      newGrid[targetIdx] = newGrid[dragging.index]
+      newGrid[dragging.index] = temp
+    }
+
     setGrid(newGrid)
-    setDragItem(null)
+    setTray(newTray)
+    setDragging(null)
+  }
+
+  const handleDropOnTray = () => {
+    if (!dragging || isCuffed || dragging.source !== 'grid') return
+    const newGrid = [...grid]
+    const newTray = [...tray]
+    const item = newGrid[dragging.index]
+    if (item) {
+      newGrid[dragging.index] = null
+      newTray.push(item)
+    }
+    setGrid(newGrid)
+    setTray(newTray)
+    setDragging(null)
   }
 
   const handleAutoPopulate = () => {
     if (isCuffed) return
-    setGrid(shuffle([...GRID_CONTENTS]))
+    const shuffled = shuffle([...GRID_CONTENTS])
+    setGrid(shuffled)
+    setTray([])
   }
 
   const handleCuffIt = async () => {
-    if (!grid) return
+    if (grid.some(c => c === null)) {
+      alert('Please fill all grid squares before cuffing in!')
+      return
+    }
     await supabase.from('students').update({ grid, cuffed: true }).eq('id', studentId)
     setIsCuffed(true)
     setPhase('waiting')
@@ -197,28 +225,60 @@ export default function Student() {
   }
 
   if (phase === 'ended') {
+    const medals = ['🥇', '🥈', '🥉']
     return (
-      <StudentEndScreen
-        myPlace={myPlace}
-        myScore={myFinalScore}
-        podiumData={podiumData}
-        podiumVisible={podiumVisible}
-        studentId={studentId}
-      />
+      <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#0a0a0f' }}>
+        <h2 className="text-2xl font-bold tracking-widest mb-8 animate-fade-in" style={{ color: '#fbbf24' }}>🚨 GAME OVER 🚨</h2>
+        <div className="flex items-end gap-4 mb-10">
+          {[1, 0, 2].map((rankIdx) => {
+            const s = podiumData?.[rankIdx]
+            if (!s) return null
+            const isMe = s.id === studentId
+            const heights = ['h-24', 'h-32', 'h-16']
+            const show = [podiumReveal >= 2, podiumReveal >= 3, podiumReveal >= 1][rankIdx]
+            return (
+              <div key={rankIdx} className={`text-center transition-all duration-1000 ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+                <p className="text-2xl mb-1">{medals[rankIdx]}</p>
+                <div className={`rounded-xl px-4 py-3 ${heights[rankIdx]} flex flex-col items-center justify-center w-24`}
+                  style={{ background: isMe ? '#1a1500' : '#1a1a2e', border: `2px solid ${isMe ? '#fbbf24' : '#374151'}` }}>
+                  <p className="font-bold text-xs truncate w-full text-center">{s.name}</p>
+                  <p className="text-xs" style={{ color: '#22c55e' }}>{formatDollars(s.total)}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        {myFinalScore && podiumReveal >= 3 && (
+          <div className="rounded-2xl p-6 text-center w-full max-w-xs animate-bounce-in"
+            style={{ background: '#111', border: `2px solid ${myPlace <= 3 ? '#fbbf24' : '#374151'}` }}>
+            <p className="text-xs text-gray-600 tracking-widest mb-2">YOUR RESULT</p>
+            {myPlace === 1 && <p className="text-4xl mb-2">🥇</p>}
+            {myPlace === 2 && <p className="text-4xl mb-2">🥈</p>}
+            {myPlace === 3 && <p className="text-4xl mb-2">🥉</p>}
+            {myPlace > 3 && <p className="text-2xl mb-2">#{myPlace}</p>}
+            <p className="text-3xl font-bold mb-1" style={{ color: '#fbbf24' }}>{formatDollars(myFinalScore.total)}</p>
+            <div className="flex justify-center gap-4 text-sm text-gray-500 mt-2">
+              <span>🏦 {formatDollars(myFinalScore.banked)}</span>
+              <span>+ 💵 {formatDollars(myFinalScore.inPlay)}</span>
+            </div>
+          </div>
+        )}
+      </div>
     )
   }
 
+  const gridFilled = grid.filter(c => c !== null).length
+  const totalItems = GRID_CONTENTS.length
+
   return (
     <div className="min-h-screen flex flex-col p-3" style={{ background: '#0a0a0f', maxWidth: '500px', margin: '0 auto' }}>
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-2">
         <div>
           <p className="text-xs text-gray-600 tracking-widest">PLAYING AS</p>
           <p className="font-bold" style={{ color: '#fbbf24' }}>{name ? decodeURIComponent(name) : ''}</p>
         </div>
         <div className="flex items-center gap-2">
-          {phase === 'paused' && (
-            <span className="text-xs px-2 py-1 rounded" style={{ background: '#1a1a2e', color: '#fbbf24', border: '1px solid #fbbf24' }}>⏸ PAUSED</span>
-          )}
+          {phase === 'paused' && <span className="text-xs px-2 py-1 rounded" style={{ background: '#1a1a2e', color: '#fbbf24', border: '1px solid #fbbf24' }}>⏸ PAUSED</span>}
           {currentRef && phase === 'playing' && (
             <div className="text-center">
               <p className="text-xs text-gray-600">CALLED</p>
@@ -230,40 +290,24 @@ export default function Student() {
       </div>
 
       {notification && (
-        <div className="rounded-xl p-4 mb-3 animate-bounce-in" style={{ background: '#1a1a2e', border: `2px solid ${notification.isDefencePrompt ? '#ef4444' : '#374151'}` }}>
+        <div className="rounded-xl p-4 mb-2 animate-bounce-in" style={{ background: '#1a1a2e', border: `2px solid ${notification.isDefencePrompt ? '#ef4444' : '#374151'}` }}>
           <p className="text-sm text-center mb-3">{notification.message}</p>
           {notification.isDefencePrompt && (
             <div className="flex flex-col gap-2">
-              <button
-                onClick={() => {
-                  const hasBoth = notification.hasBulletproof && notification.hasFrameJob
-                  if (hasBoth) {
-                    setNotification({ ...notification, choosingDefence: true })
-                  } else {
-                    const type = notification.hasBulletproof ? 'BULLETPROOF' : 'FRAME_JOB'
-                    handleDefenceResponse(true, type)
-                  }
-                }}
-                className="w-full py-3 rounded-xl font-bold tracking-wider"
-                style={{ background: '#22c55e', color: 'white' }}
-              >
+              <button onClick={() => {
+                const hasBoth = notification.hasBulletproof && notification.hasFrameJob
+                if (hasBoth) setNotification({ ...notification, choosingDefence: true })
+                else handleDefenceResponse(true, notification.hasBulletproof ? 'BULLETPROOF' : 'FRAME_JOB')
+              }} className="w-full py-3 rounded-xl font-bold" style={{ background: '#22c55e', color: 'white' }}>
                 🛡️ USE DEFENCE
               </button>
               {notification.choosingDefence && (
                 <div className="flex gap-2">
-                  {notification.hasBulletproof && (
-                    <button onClick={() => handleDefenceResponse(true, 'BULLETPROOF')} className="flex-1 py-2 rounded-lg text-sm font-bold" style={{ background: '#1a3a1a', border: '1px solid #22c55e', color: '#22c55e' }}>🦺 Bulletproof</button>
-                  )}
-                  {notification.hasFrameJob && (
-                    <button onClick={() => handleDefenceResponse(true, 'FRAME_JOB')} className="flex-1 py-2 rounded-lg text-sm font-bold" style={{ background: '#1a1a3a', border: '1px solid #818cf8', color: '#818cf8' }}>🪞 Frame Job</button>
-                  )}
+                  {notification.hasBulletproof && <button onClick={() => handleDefenceResponse(true, 'BULLETPROOF')} className="flex-1 py-2 rounded-lg text-sm font-bold" style={{ background: '#1a3a1a', border: '1px solid #22c55e', color: '#22c55e' }}>🦺 Bulletproof</button>}
+                  {notification.hasFrameJob && <button onClick={() => handleDefenceResponse(true, 'FRAME_JOB')} className="flex-1 py-2 rounded-lg text-sm font-bold" style={{ background: '#1a1a3a', border: '1px solid #818cf8', color: '#818cf8' }}>🪞 Frame Job</button>}
                 </div>
               )}
-              <button
-                onClick={() => handleDefenceResponse(false)}
-                className="w-full py-2 rounded-xl text-sm"
-                style={{ background: '#1a1a1a', border: '1px solid #374151', color: '#9ca3af' }}
-              >
+              <button onClick={() => handleDefenceResponse(false)} className="w-full py-2 rounded-xl text-sm" style={{ background: '#1a1a1a', border: '1px solid #374151', color: '#9ca3af' }}>
                 No thanks
               </button>
             </div>
@@ -271,7 +315,7 @@ export default function Student() {
         </div>
       )}
 
-      <div className="flex-1 mb-3">
+      <div className="mb-2">
         <div className="grid grid-cols-8 gap-1 mb-1">
           <div />
           {COLS.map(c => <div key={c} className="text-center text-xs text-gray-600 font-bold">{c}</div>)}
@@ -281,35 +325,34 @@ export default function Student() {
             <div className="text-xs text-gray-600 font-bold flex items-center justify-center">{row}</div>
             {COLS.map((col, colIdx) => {
               const idx = colIdx * 7 + rowIdx
-              const cell = grid ? grid[idx] : null
+              const cell = grid[idx]
               const ref = `${col}${row}`
               const called = calledRefs.includes(ref)
               const isCurrent = ref === currentRef
               const isPickable = canPickSquare && !called
               return (
-                <div
-                  key={ref}
-                  className={`aspect-square rounded flex flex-col items-center justify-center text-xs transition-all select-none`}
+                <div key={ref}
+                  className="aspect-square rounded flex flex-col items-center justify-center text-xs transition-all select-none"
                   style={{
-                    background: isCurrent ? '#2a1500' : called ? '#0d0d10' : '#1a1a2e',
-                    border: isCurrent ? '2px solid #fbbf24' : isPickable ? '2px solid #22c55e' : '1px solid #222',
+                    background: isCurrent ? '#2a1500' : called ? '#0d0d10' : cell ? '#1a1a2e' : '#111',
+                    border: isCurrent ? '2px solid #fbbf24' : isPickable ? '2px solid #22c55e' : called ? '1px solid #1a1a1a' : cell ? '1px solid #374151' : '1px dashed #333',
                     opacity: called ? 0.3 : 1,
                     cursor: isCuffed && !isPickable ? 'default' : isPickable ? 'pointer' : isCuffed ? 'default' : 'grab',
                     filter: called ? 'grayscale(1)' : 'none',
                   }}
-                  draggable={!isCuffed && !called}
-                  onDragStart={() => handleDragStart(idx)}
+                  draggable={!isCuffed && !called && !!cell}
+                  onDragStart={() => handleDragStartGrid(idx)}
                   onDragOver={e => e.preventDefault()}
-                  onDrop={() => handleDrop(idx)}
+                  onDrop={() => handleDropOnGrid(idx)}
                   onClick={() => isPickable && handleCellClick(idx)}
                 >
                   {cell && (
                     <>
                       {cell.type === 'symbol' ? (
-                        <span className="text-base leading-none">{SYMBOLS[cell.value]?.icon}</span>
+                        <span style={{ fontSize: '16px', lineHeight: 1 }}>{SYMBOLS[cell.value]?.icon}</span>
                       ) : (
-                        <span className="font-bold text-center leading-tight" style={{ color: '#22c55e', fontSize: '9px' }}>
-                          ${cell.value >= 1000 ? `${cell.value/1000}K` : cell.value}
+                        <span className="font-bold text-center leading-tight" style={{ color: '#22c55e', fontSize: '11px' }}>
+                          ${cell.value >= 1000 ? `${cell.value / 1000}K` : cell.value}
                         </span>
                       )}
                     </>
@@ -322,29 +365,60 @@ export default function Student() {
       </div>
 
       {(phase === 'setup' || phase === 'waiting') && !isCuffed && (
-        <div className="flex gap-3 mb-3">
-          <button onClick={handleAutoPopulate} className="flex-1 py-2 rounded-xl text-sm font-bold tracking-wider" style={{ background: '#1a1a2e', border: '1px solid #374151', color: '#9ca3af' }}>
-            🎲 AUTO
-          </button>
-          <button onClick={handleCuffIt} className="flex-1 py-3 rounded-xl font-bold tracking-wider text-lg" style={{ background: '#ef4444', color: 'white', border: '2px solid #ef4444' }}>
-            🔒 CUFF IT IN
+        <div className="mb-2">
+          <div className="flex justify-between items-center mb-1">
+            <p className="text-xs text-gray-600 tracking-widest">DRAG TO GRID ({gridFilled}/{totalItems})</p>
+            <button onClick={handleAutoPopulate} className="text-xs px-3 py-1 rounded-lg" style={{ background: '#1a1a2e', border: '1px solid #374151', color: '#9ca3af' }}>🎲 AUTO</button>
+          </div>
+          <div className="rounded-xl p-2 min-h-16 flex flex-wrap gap-1"
+            style={{ background: '#111', border: '1px solid #333' }}
+            onDragOver={e => e.preventDefault()}
+            onDrop={handleDropOnTray}
+          >
+            {tray.map((item, i) => (
+              <div key={i}
+                className="rounded flex items-center justify-center cursor-grab select-none"
+                style={{ width: '36px', height: '36px', background: '#1a1a2e', border: '1px solid #374151', flexShrink: 0 }}
+                draggable
+                onDragStart={() => handleDragStartTray(i)}
+              >
+                {item.type === 'symbol' ? (
+                  <span style={{ fontSize: '16px' }}>{SYMBOLS[item.value]?.icon}</span>
+                ) : (
+                  <span className="font-bold" style={{ color: '#22c55e', fontSize: '9px' }}>${item.value >= 1000 ? `${item.value / 1000}K` : item.value}</span>
+                )}
+              </div>
+            ))}
+            {tray.length === 0 && (
+              <p className="text-gray-700 text-xs p-2">All items placed on grid ✅</p>
+            )}
+          </div>
+          <button onClick={handleCuffIt} disabled={grid.some(c => c === null)}
+            className="w-full py-3 rounded-xl font-bold tracking-wider text-lg mt-2"
+            style={{
+              background: grid.some(c => c === null) ? '#1a1a1a' : '#ef4444',
+              color: grid.some(c => c === null) ? '#444' : 'white',
+              border: grid.some(c => c === null) ? '1px solid #333' : '2px solid #ef4444',
+              cursor: grid.some(c => c === null) ? 'not-allowed' : 'pointer',
+            }}>
+            🔒 CUFF IT IN {grid.some(c => c === null) ? `(${gridFilled}/${totalItems})` : ''}
           </button>
         </div>
       )}
 
       {isCuffed && phase === 'waiting' && (
-        <div className="text-center py-3 mb-3 rounded-xl animate-fade-in" style={{ background: '#0a1a0a', border: '1px solid #22c55e' }}>
+        <div className="text-center py-3 mb-2 rounded-xl animate-fade-in" style={{ background: '#0a1a0a', border: '1px solid #22c55e' }}>
           <p className="text-sm tracking-widest" style={{ color: '#22c55e' }}>🔒 CUFFED IN — Waiting for game to start...</p>
         </div>
       )}
 
       <div className="grid grid-cols-4 gap-2">
         <div className="rounded-xl p-2 text-center" style={{ background: '#111', border: '1px solid #333' }}>
-          <p className="text-xs text-gray-600 mb-1">🏦</p>
+          <p className="text-xs text-gray-600 mb-1">🏦 BANK</p>
           <p className={`font-bold text-sm ${scoreAnimating ? 'animate-slot' : ''}`} style={{ color: '#22c55e' }}>{formatDollars(pointsBanked)}</p>
         </div>
         <div className="rounded-xl p-2 text-center" style={{ background: '#111', border: '1px solid #333' }}>
-          <p className="text-xs text-gray-600 mb-1">💵</p>
+          <p className="text-xs text-gray-600 mb-1">💵 PLAY</p>
           <p className={`font-bold text-sm ${scoreAnimating ? 'animate-slot' : ''}`} style={{ color: '#fbbf24' }}>{formatDollars(pointsInPlay)}</p>
         </div>
         <div className="rounded-xl p-2 text-center" style={{ background: '#111', border: `1px solid ${bulletproof ? '#22c55e' : '#222'}` }}>
@@ -368,48 +442,6 @@ export default function Student() {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  )
-}
-
-function StudentEndScreen({ myPlace, myScore, podiumData, podiumVisible, studentId }) {
-  const medals = ['🥇', '🥈', '🥉']
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: '#0a0a0f' }}>
-      {podiumVisible && (
-        <>
-          <h2 className="text-2xl font-bold tracking-widest mb-8 animate-fade-in" style={{ color: '#fbbf24' }}>🚨 GAME OVER 🚨</h2>
-          <div className="flex items-end gap-4 mb-10">
-            {[1, 0, 2].map((rankIdx) => {
-              const s = podiumData?.[rankIdx]
-              if (!s) return null
-              const isMe = s.id === studentId
-              const heights = ['h-24', 'h-32', 'h-16']
-              return (
-                <div key={rankIdx} className="text-center animate-slide-up" style={{ animationDelay: `${rankIdx * 0.5}s` }}>
-                  <p className="text-2xl mb-1">{medals[rankIdx]}</p>
-                  <div className={`rounded-xl px-4 py-3 ${heights[rankIdx]} flex flex-col items-center justify-center w-24`} style={{ background: isMe ? '#1a1500' : '#1a1a2e', border: `2px solid ${isMe ? '#fbbf24' : '#374151'}` }}>
-                    <p className="font-bold text-xs truncate w-full text-center">{s.name}</p>
-                    <p className="text-xs" style={{ color: '#22c55e' }}>{formatDollars(s.total)}</p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-          {myScore && (
-            <div className="rounded-2xl p-6 text-center w-full max-w-xs animate-bounce-in" style={{ background: '#111', border: `2px solid ${myPlace <= 3 ? '#fbbf24' : '#374151'}` }}>
-              <p className="text-xs text-gray-600 tracking-widest mb-2">YOUR RESULT</p>
-              {myPlace <= 3 && <p className="text-4xl mb-2">{medals[myPlace - 1]}</p>}
-              {myPlace > 3 && <p className="text-2xl mb-2">#{myPlace}</p>}
-              <p className="text-3xl font-bold mb-1" style={{ color: '#fbbf24' }}>{formatDollars(myScore.total)}</p>
-              <div className="flex justify-center gap-4 text-sm text-gray-500 mt-2">
-                <span>🏦 {formatDollars(myScore.banked)}</span>
-                <span>+ 💵 {formatDollars(myScore.inPlay)}</span>
-              </div>
-            </div>
-          )}
-        </>
       )}
     </div>
   )
