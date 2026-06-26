@@ -478,7 +478,7 @@ export default function Teacher() {
           <div className="text-center mb-8">
             <div className="text-4xl mb-3">👮</div>
             <h1 className="text-3xl font-bold tracking-widest" style={{ color: '#ef4444' }}>TEACHER LOGIN</h1>
-            <p className="text-gray-600 text-xs tracking-widest mt-1">COPS & ROBBERS</p>
+            <p className="text-gray-600 text-xs tracking-widest mt-1">COPS & BANDITS</p>
           </div>
           <div className="rounded-2xl p-6" style={{ background: '#111', border: '1px solid #333' }}>
             <div className="mb-4">
@@ -511,7 +511,7 @@ export default function Teacher() {
     return (
       <div className="min-h-screen p-6" style={{ background: '#0a0a0f' }}>
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold tracking-widest mb-6 text-center" style={{ color: '#ef4444' }}>COPS & ROBBERS</h1>
+          <h1 className="text-2xl font-bold tracking-widest mb-6 text-center" style={{ color: '#ef4444' }}>COPS & BANDITS</h1>
           <div className="rounded-2xl p-8 text-center mb-6" style={{ background: '#111', border: '2px solid #ef4444' }}>
             <p className="text-sm text-gray-500 tracking-widest mb-2">JOIN CODE</p>
             <p className="text-7xl font-bold tracking-widest mb-4" style={{ color: '#fbbf24' }}>{gameCode}</p>
@@ -546,7 +546,7 @@ export default function Teacher() {
     <div className="min-h-screen p-3" style={{ background: '#0a0a0f' }}>
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h1 className="text-xl font-bold tracking-widest" style={{ color: '#ef4444' }}>COPS & ROBBERS</h1>
+          <h1 className="text-xl font-bold tracking-widest" style={{ color: '#ef4444' }}>COPS & BANDITS</h1>
           <p className="text-xs text-gray-600 tracking-widest">TEACHER CONTROL</p>
         </div>
         <div className="flex items-center gap-3">
