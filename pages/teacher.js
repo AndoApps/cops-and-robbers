@@ -1,4 +1,4 @@
-javascriptimport { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { generateGameCode, COLS, ROWS, SYMBOLS, ACTION_SYMBOLS, formatDollars, shuffle, ALL_GRID_REFS } from '../lib/gameLogic'
 
