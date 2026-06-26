@@ -1,4 +1,4 @@
-javascriptimport { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { COLS, ROWS, SYMBOLS, GRID_CONTENTS, formatDollars, shuffle } from '../lib/gameLogic'
