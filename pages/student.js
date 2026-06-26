@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+javascriptimport { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { COLS, ROWS, SYMBOLS, GRID_CONTENTS, formatDollars, shuffle } from '../lib/gameLogic'
@@ -6,6 +6,19 @@ import { COLS, ROWS, SYMBOLS, GRID_CONTENTS, formatDollars, shuffle } from '../l
 // Split the 49 items into icons (must be dragged) and dollar cells (can be auto-filled)
 const ICON_ITEMS = GRID_CONTENTS.filter(c => c.type === 'symbol')
 const DOLLAR_ITEMS = GRID_CONTENTS.filter(c => c.type === 'points')
+
+// Short labels that fit under a tiny grid cell
+const SHORT_LABELS = {
+  HEIST: 'Heist',
+  ARREST: 'Arrest',
+  INSIDE_JOB: 'Gift',
+  SWITCHEROO: 'Swap',
+  TIP_OFF: 'Tip Off',
+  BULLETPROOF: 'B-Proof',
+  FRAME_JOB: 'Frame',
+  CRIME_SPREE: 'x2',
+  VAULT: 'Vault',
+}
 
 export default function Student() {
   const router = useRouter()
@@ -403,13 +416,13 @@ export default function Student() {
             {tray.map((item, i) => (
               <div
                 key={i}
-                className="rounded-lg flex items-center justify-center cursor-grab select-none"
-                style={{ width: '52px', height: '52px', background: '#1a1a2e', border: '2px solid #fbbf24', flexShrink: 0 }}
+                className="rounded-lg flex flex-col items-center justify-center cursor-grab select-none"
+                style={{ width: '64px', height: '64px', background: '#1a1a2e', border: '2px solid #fbbf24', flexShrink: 0 }}
                 draggable
                 onDragStart={() => handleDragStartTray(i)}
-                title={SYMBOLS[item.value]?.name}
               >
-                <span style={{ fontSize: '28px' }}>{SYMBOLS[item.value]?.icon}</span>
+                <span style={{ fontSize: '26px', lineHeight: 1 }}>{SYMBOLS[item.value]?.icon}</span>
+                <span style={{ fontSize: '8px', color: '#fbbf24', marginTop: '2px', lineHeight: 1, fontWeight: 700 }}>{SHORT_LABELS[item.value]}</span>
               </div>
             ))}
             {tray.length === 0 && (
