@@ -3,6 +3,10 @@ import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { COLS, ROWS, SYMBOLS, GRID_CONTENTS, formatDollars, shuffle } from '../lib/gameLogic'
 
+// Split the 49 items into icons (must be dragged) and dollar cells (can be auto-filled)
+const ICON_ITEMS = GRID_CONTENTS.filter(c => c.type === 'symbol')
+const DOLLAR_ITEMS = GRID_CONTENTS.filter(c => c.type === 'points')
+
 export default function Student() {
   const router = useRouter()
   const { code, name } = router.query
@@ -11,7 +15,7 @@ export default function Student() {
   const [gameId, setGameId] = useState(null)
   const [studentId, setStudentId] = useState(null)
   const [grid, setGrid] = useState(Array(49).fill(null))
-  const [tray, setTray] = useState([])
+  const [tray, setTray] = useState([]) // only icons live here
   const [calledRefs, setCalledRefs] = useState([])
   const [currentRef, setCurrentRef] = useState(null)
   const [pointsInPlay, setPointsInPlay] = useState(0)
@@ -58,7 +62,9 @@ export default function Student() {
     setStudentId(student.id)
     studentIdRef.current = student.id
     setPhase('setup')
-    setTray(shuffle([...GRID_CONTENTS]))
+    // Tray starts with ONLY the 9 icons — shuffled. Dollar cells are not placed yet.
+    setTray(shuffle([...ICON_ITEMS]))
+    setGrid(Array(49).fill(null))
     subscribeToGame(game.id, student.id)
     subscribeToMyRecord(student.id)
   }
@@ -131,6 +137,7 @@ export default function Student() {
 
   const handleDragStartGrid = (idx) => {
     if (isCuffed || !grid[idx]) return
+    if (grid[idx].type !== 'symbol') return
     setDragging({ source: 'grid', index: idx })
   }
 
@@ -141,13 +148,20 @@ export default function Student() {
 
     if (dragging.source === 'tray') {
       const item = newTray[dragging.index]
-      if (newGrid[targetIdx]) {
-        newTray[dragging.index] = newGrid[targetIdx]
+      const existing = newGrid[targetIdx]
+      if (existing) {
+        if (existing.type === 'symbol') {
+          newTray[dragging.index] = existing
+        } else {
+          return
+        }
       } else {
         newTray.splice(dragging.index, 1)
       }
       newGrid[targetIdx] = item
     } else if (dragging.source === 'grid') {
+      const targetCell = newGrid[targetIdx]
+      if (targetCell && targetCell.type !== 'symbol') return
       const temp = newGrid[targetIdx]
       newGrid[targetIdx] = newGrid[dragging.index]
       newGrid[dragging.index] = temp
@@ -160,23 +174,31 @@ export default function Student() {
 
   const handleDropOnTray = () => {
     if (!dragging || isCuffed || dragging.source !== 'grid') return
+    const item = grid[dragging.index]
+    if (!item || item.type !== 'symbol') return
     const newGrid = [...grid]
     const newTray = [...tray]
-    const item = newGrid[dragging.index]
-    if (item) {
-      newGrid[dragging.index] = null
-      newTray.push(item)
-    }
+    newGrid[dragging.index] = null
+    newTray.push(item)
     setGrid(newGrid)
     setTray(newTray)
     setDragging(null)
   }
 
-  const handleAutoPopulate = () => {
-    if (isCuffed) return
-    const shuffled = shuffle([...GRID_CONTENTS])
-    setGrid(shuffled)
-    setTray([])
+  const allIconsPlaced = tray.length === 0
+
+  const handleAutoFillDollars = () => {
+    if (isCuffed || !allIconsPlaced) return
+    const newGrid = [...grid]
+    const shuffledDollars = shuffle([...DOLLAR_ITEMS])
+    let dIdx = 0
+    for (let i = 0; i < newGrid.length; i++) {
+      if (newGrid[i] === null) {
+        newGrid[i] = shuffledDollars[dIdx]
+        dIdx++
+      }
+    }
+    setGrid(newGrid)
   }
 
   const handleCuffIt = async () => {
@@ -268,7 +290,6 @@ export default function Student() {
   }
 
   const gridFilled = grid.filter(c => c !== null).length
-  const totalItems = GRID_CONTENTS.length
 
   return (
     <div className="min-h-screen flex flex-col p-3" style={{ background: '#0a0a0f', maxWidth: '500px', margin: '0 auto' }}>
@@ -330,17 +351,19 @@ export default function Student() {
               const called = calledRefs.includes(ref)
               const isCurrent = ref === currentRef
               const isPickable = canPickSquare && !called
+              const isIconCell = cell && cell.type === 'symbol'
               return (
-                <div key={ref}
-                  className="aspect-square rounded flex flex-col items-center justify-center text-xs transition-all select-none"
+                <div
+                  key={ref}
+                  className="aspect-square rounded flex flex-col items-center justify-center transition-all select-none"
                   style={{
                     background: isCurrent ? '#2a1500' : called ? '#0d0d10' : cell ? '#1a1a2e' : '#111',
                     border: isCurrent ? '2px solid #fbbf24' : isPickable ? '2px solid #22c55e' : called ? '1px solid #1a1a1a' : cell ? '1px solid #374151' : '1px dashed #333',
                     opacity: called ? 0.3 : 1,
-                    cursor: isCuffed && !isPickable ? 'default' : isPickable ? 'pointer' : isCuffed ? 'default' : 'grab',
+                    cursor: isCuffed && !isPickable ? 'default' : isPickable ? 'pointer' : isCuffed ? 'default' : (isIconCell ? 'grab' : 'default'),
                     filter: called ? 'grayscale(1)' : 'none',
                   }}
-                  draggable={!isCuffed && !called && !!cell}
+                  draggable={!isCuffed && !called && isIconCell}
                   onDragStart={() => handleDragStartGrid(idx)}
                   onDragOver={e => e.preventDefault()}
                   onDrop={() => handleDropOnGrid(idx)}
@@ -349,7 +372,7 @@ export default function Student() {
                   {cell && (
                     <>
                       {cell.type === 'symbol' ? (
-                        <span style={{ fontSize: '16px', lineHeight: 1 }}>{SYMBOLS[cell.value]?.icon}</span>
+                        <span style={{ fontSize: '20px', lineHeight: 1 }}>{SYMBOLS[cell.value]?.icon}</span>
                       ) : (
                         <span className="font-bold text-center leading-tight" style={{ color: '#22c55e', fontSize: '11px' }}>
                           ${cell.value >= 1000 ? `${cell.value / 1000}K` : cell.value}
@@ -367,41 +390,52 @@ export default function Student() {
       {(phase === 'setup' || phase === 'waiting') && !isCuffed && (
         <div className="mb-2">
           <div className="flex justify-between items-center mb-1">
-            <p className="text-xs text-gray-600 tracking-widest">DRAG TO GRID ({gridFilled}/{totalItems})</p>
-            <button onClick={handleAutoPopulate} className="text-xs px-3 py-1 rounded-lg" style={{ background: '#1a1a2e', border: '1px solid #374151', color: '#9ca3af' }}>🎲 AUTO</button>
+            <p className="text-xs text-gray-600 tracking-widest">
+              {allIconsPlaced ? '✅ ALL ICONS PLACED' : `DRAG ICONS TO GRID (${ICON_ITEMS.length - tray.length}/${ICON_ITEMS.length})`}
+            </p>
           </div>
-          <div className="rounded-xl p-2 min-h-16 flex flex-wrap gap-1"
-            style={{ background: '#111', border: '1px solid #333' }}
+          <div
+            className="rounded-xl p-2 min-h-20 flex flex-wrap gap-2 justify-center"
+            style={{ background: '#111', border: tray.length > 0 ? '2px dashed #fbbf24' : '1px solid #333' }}
             onDragOver={e => e.preventDefault()}
             onDrop={handleDropOnTray}
           >
             {tray.map((item, i) => (
-              <div key={i}
-                className="rounded flex items-center justify-center cursor-grab select-none"
-                style={{ width: '36px', height: '36px', background: '#1a1a2e', border: '1px solid #374151', flexShrink: 0 }}
+              <div
+                key={i}
+                className="rounded-lg flex items-center justify-center cursor-grab select-none"
+                style={{ width: '52px', height: '52px', background: '#1a1a2e', border: '2px solid #fbbf24', flexShrink: 0 }}
                 draggable
                 onDragStart={() => handleDragStartTray(i)}
+                title={SYMBOLS[item.value]?.name}
               >
-                {item.type === 'symbol' ? (
-                  <span style={{ fontSize: '16px' }}>{SYMBOLS[item.value]?.icon}</span>
-                ) : (
-                  <span className="font-bold" style={{ color: '#22c55e', fontSize: '9px' }}>${item.value >= 1000 ? `${item.value / 1000}K` : item.value}</span>
-                )}
+                <span style={{ fontSize: '28px' }}>{SYMBOLS[item.value]?.icon}</span>
               </div>
             ))}
             {tray.length === 0 && (
-              <p className="text-gray-700 text-xs p-2">All items placed on grid ✅</p>
+              <p className="text-green-500 text-xs p-2 font-bold">🎉 Now fill the rest with dollar amounts!</p>
             )}
           </div>
-          <button onClick={handleCuffIt} disabled={grid.some(c => c === null)}
+
+          {allIconsPlaced && gridFilled < 49 && (
+            <button onClick={handleAutoFillDollars} className="w-full py-3 rounded-xl font-bold tracking-wider mt-2"
+              style={{ background: '#1a1a2e', border: '2px solid #22c55e', color: '#22c55e' }}>
+              💵 AUTO-FILL DOLLAR AMOUNTS
+            </button>
+          )}
+
+          <button
+            onClick={handleCuffIt}
+            disabled={grid.some(c => c === null)}
             className="w-full py-3 rounded-xl font-bold tracking-wider text-lg mt-2"
             style={{
               background: grid.some(c => c === null) ? '#1a1a1a' : '#ef4444',
               color: grid.some(c => c === null) ? '#444' : 'white',
               border: grid.some(c => c === null) ? '1px solid #333' : '2px solid #ef4444',
               cursor: grid.some(c => c === null) ? 'not-allowed' : 'pointer',
-            }}>
-            🔒 CUFF IT IN {grid.some(c => c === null) ? `(${gridFilled}/${totalItems})` : ''}
+            }}
+          >
+            🔒 CUFF IT IN {grid.some(c => c === null) ? `(${gridFilled}/49)` : ''}
           </button>
         </div>
       )}
