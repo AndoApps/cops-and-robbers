@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+javascriptimport { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { generateGameCode, COLS, ROWS, SYMBOLS, ACTION_SYMBOLS, formatDollars, shuffle, ALL_GRID_REFS } from '../lib/gameLogic'
 
@@ -30,6 +30,7 @@ export default function Teacher() {
   const [notification, setNotification] = useState('')
   const [podiumData, setPodiumData] = useState(null)
   const [scoreOverride, setScoreOverride] = useState({ show: false, studentId: null, value: '' })
+  const [removeConfirm, setRemoveConfirm] = useState({ show: false, studentId: null, studentName: '' })
 
   const defenceTimerRef = useRef(null)
   const tipOffTimerRef = useRef(null)
@@ -426,6 +427,41 @@ export default function Teacher() {
     await reloadStudents()
   }
 
+  // Teacher-initiated removal — works in lobby or mid-game. Same effect as an approved leave:
+  // the student's active flag is set to false, which disables their grid and excludes them
+  // from cuffed counts, actions, pick-next, and final scoring.
+  const handleRemoveStudent = async (studentId) => {
+    // If this student happens to be mid-action or mid-defence, clear any pending references for them
+    if (activeActionRef.current?.studentId === studentId) {
+      setActionsBox(prev => prev.filter(a => a.studentId !== studentId))
+      if (activeAction?.studentId === studentId) {
+        setActiveAction(null)
+        activeActionRef.current = null
+        setAwaitingTarget(false)
+      }
+    }
+    if (pendingDefenceTargetRef.current === studentId) {
+      pendingDefenceTargetRef.current = null
+      setDefenceCountdown(null)
+      if (defenceTimerRef.current) clearInterval(defenceTimerRef.current)
+    }
+    setPickNextBox(prev => {
+      const updated = prev.filter(p => p.studentId !== studentId)
+      pickNextBoxRef.current = updated
+      return updated
+    })
+    if (activeTipOffRef.current?.studentId === studentId) {
+      setActiveTipOff(null)
+      activeTipOffRef.current = null
+      setTipOffCountdown(null)
+      if (tipOffTimerRef.current) clearInterval(tipOffTimerRef.current)
+    }
+
+    await supabase.from('students').update({ active: false }).eq('id', studentId)
+    setRemoveConfirm({ show: false, studentId: null, studentName: '' })
+    await reloadStudents()
+  }
+
   const activeStudents = students.filter(s => s.active !== false)
   const cuffedCount = activeStudents.filter(s => s.cuffed).length
   const canStart = cuffedCount > 0 && cuffedCount === activeStudents.length
@@ -491,6 +527,7 @@ export default function Teacher() {
                 <div key={s.id} className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: '#1a1a2e', border: `1px solid ${s.cuffed ? '#22c55e' : '#374151'}` }}>
                   <span className="text-sm flex-1 truncate">{s.name}</span>
                   <span>{s.cuffed ? '🔒' : '⏳'}</span>
+                  <button onClick={() => setRemoveConfirm({ show: true, studentId: s.id, studentName: s.name })} className="text-gray-600 hover:text-red-500 text-xs px-1">✕</button>
                 </div>
               ))}
               {activeStudents.length === 0 && <div className="col-span-3 text-center text-gray-700 py-4">Waiting for students to join...</div>}
@@ -660,7 +697,10 @@ export default function Teacher() {
               {activeStudents.map(s => (
                 <div key={s.id} className="flex items-center justify-between py-1 border-b border-gray-900">
                   <span className="text-xs text-gray-400">{s.name}</span>
-                  <button onClick={() => setScoreOverride({ show: true, studentId: s.id, value: s.points_in_play || 0 })} className="text-xs text-gray-700 hover:text-gray-400">✏️</button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setScoreOverride({ show: true, studentId: s.id, value: s.points_in_play || 0 })} className="text-xs text-gray-700 hover:text-gray-400">✏️</button>
+                    <button onClick={() => setRemoveConfirm({ show: true, studentId: s.id, studentName: s.name })} className="text-xs text-gray-700 hover:text-red-500">✕</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -678,6 +718,19 @@ export default function Teacher() {
             <div className="flex gap-3">
               <button onClick={handleScoreOverride} className="flex-1 py-2 rounded-lg font-bold" style={{ background: '#ef4444', color: 'white' }}>Apply</button>
               <button onClick={() => setScoreOverride({ show: false, studentId: null, value: '' })} className="flex-1 py-2 rounded-lg" style={{ background: '#333', color: 'white' }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {removeConfirm.show && (
+        <div className="popup-overlay">
+          <div className="rounded-2xl p-6 w-80 text-center" style={{ background: '#111', border: '1px solid #ef4444' }}>
+            <p className="text-lg font-bold mb-2" style={{ color: '#ef4444' }}>Remove {removeConfirm.studentName}?</p>
+            <p className="text-sm text-gray-500 mb-6">They will be removed from the game and cannot rejoin with this code.</p>
+            <div className="flex gap-3">
+              <button onClick={() => handleRemoveStudent(removeConfirm.studentId)} className="flex-1 py-2 rounded-lg font-bold" style={{ background: '#ef4444', color: 'white' }}>Remove</button>
+              <button onClick={() => setRemoveConfirm({ show: false, studentId: null, studentName: '' })} className="flex-1 py-2 rounded-lg" style={{ background: '#333', color: 'white' }}>Cancel</button>
             </div>
           </div>
         </div>
