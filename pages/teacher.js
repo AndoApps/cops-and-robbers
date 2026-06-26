@@ -41,6 +41,8 @@ export default function Teacher() {
   const pickNextBoxRef = useRef([])
   const activeTipOffRef = useRef(null)
   const phaseRef = useRef('lobby')
+  const pendingDefenceTargetRef = useRef(null)
+  const processingDefenceRef = useRef(false)
 
   const handleLogin = () => {
     if (username === 'admin@admin' && password === 'admin') {
@@ -82,7 +84,13 @@ export default function Teacher() {
         }
         if (payload.new) {
           const s = payload.new
-          if (s.defence_response !== null && s.defence_response !== undefined && activeActionRef.current) {
+          // Only process a defence response if: it's not null, we're waiting on a defence decision,
+          // AND this update is from the exact student we're expecting it from
+          if (
+            s.defence_response !== null &&
+            s.defence_response !== undefined &&
+            pendingDefenceTargetRef.current === s.id
+          ) {
             handleDefenceResponse(s.defence_response, s.id)
           }
           if (s.tip_off_pick && activeTipOffRef.current && activeTipOffRef.current.studentId === s.id) {
@@ -217,6 +225,7 @@ export default function Teacher() {
         hasFrameJob: targetStudent.frame_job,
       })
       setAwaitingTarget(false)
+      pendingDefenceTargetRef.current = targetStudent.id
       startDefenceCountdown(targetStudent.id)
     } else {
       setAwaitingTarget(false)
@@ -234,6 +243,7 @@ export default function Teacher() {
       if (count <= 0) {
         clearInterval(defenceTimerRef.current)
         setDefenceCountdown(null)
+        pendingDefenceTargetRef.current = null
         const action = activeActionRef.current
         if (action) executeAction(action.studentId, targetId, action.symbol, false)
       }
@@ -241,11 +251,18 @@ export default function Teacher() {
   }
 
   const handleDefenceResponse = async (response, responderId) => {
+    // Guard against double-firing — if we're already processing a defence response, ignore re-entry
+    if (processingDefenceRef.current) return
+    processingDefenceRef.current = true
+
+    // Clear the pending target immediately so no other event can re-trigger this
+    pendingDefenceTargetRef.current = null
+
     if (defenceTimerRef.current) clearInterval(defenceTimerRef.current)
     setDefenceCountdown(null)
 
     const action = activeActionRef.current
-    if (!action) return
+    if (!action) { processingDefenceRef.current = false; return }
 
     const used = response.used
     const type = response.type
@@ -264,6 +281,8 @@ export default function Teacher() {
       await supabase.from('students').update({ frame_job: false }).eq('id', responderId)
       await executeAction(responderId, action.studentId, action.symbol, true)
     }
+
+    processingDefenceRef.current = false
   }
 
   const executeAction = async (attackerId, targetId, symbol, reversed) => {
