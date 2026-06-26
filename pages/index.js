@@ -5,11 +5,16 @@ export default function Home() {
   const router = useRouter()
   const [joinCode, setJoinCode] = useState('')
   const [studentName, setStudentName] = useState('')
-  const [step, setStep] = useState('choose')
+  const [step, setStep] = useState('choose') // choose, join-student
   const [error, setError] = useState('')
 
-  const goTeacher = () => router.push('/teacher')
-  const goStudent = () => setStep('join-student')
+  const goTeacher = () => {
+    router.push('/teacher')
+  }
+
+  const goStudent = () => {
+    setStep('join-student')
+  }
 
   const handleJoin = () => {
     if (!studentName.trim()) { setError('Please enter your name'); return }
@@ -19,16 +24,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'linear-gradient(135deg, #0a0a0f 0%, #1a0a00 50%, #0a0a0f 100%)' }}>
+      
+      {/* Title */}
       <div className="text-center mb-12">
         <div className="text-6xl mb-4">🚔💰</div>
         <h1 className="text-5xl font-bold tracking-widest mb-2" style={{ color: '#ef4444', textShadow: '0 0 30px #ef444466' }}>
-          COPS &amp; ROBBERS
+          COPS &amp; BANDITS
         </h1>
         <p className="text-gray-500 tracking-widest text-sm">THE CLASSROOM GAME</p>
       </div>
 
       {step === 'choose' && (
-        <div className="flex flex-col gap-4 w-full max-w-xs">
+        <div className="flex flex-col gap-4 w-full max-w-xs animate-fade-in">
           <button
             onClick={goTeacher}
             className="w-full py-4 rounded-xl text-lg font-bold tracking-widest transition-all duration-200 hover:scale-105"
@@ -47,9 +54,10 @@ export default function Home() {
       )}
 
       {step === 'join-student' && (
-        <div className="w-full max-w-xs">
+        <div className="w-full max-w-xs animate-fade-in">
           <div className="rounded-2xl p-6" style={{ background: '#111', border: '1px solid #333' }}>
             <h2 className="text-xl font-bold tracking-wider mb-6 text-center" style={{ color: '#fbbf24' }}>JOIN GAME</h2>
+            
             <div className="mb-4">
               <label className="block text-xs tracking-widest text-gray-500 mb-2">YOUR NAME</label>
               <input
@@ -63,6 +71,7 @@ export default function Home() {
                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
               />
             </div>
+
             <div className="mb-6">
               <label className="block text-xs tracking-widest text-gray-500 mb-2">GAME CODE</label>
               <input
@@ -76,7 +85,9 @@ export default function Home() {
                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
               />
             </div>
+
             {error && <p className="text-red-400 text-sm text-center mb-4">{error}</p>}
+
             <button
               onClick={handleJoin}
               className="w-full py-3 rounded-xl font-bold tracking-widest transition-all hover:scale-105"
@@ -84,6 +95,7 @@ export default function Home() {
             >
               JOIN 🚀
             </button>
+
             <button
               onClick={() => setStep('choose')}
               className="w-full py-2 mt-3 text-gray-600 text-sm tracking-wider hover:text-gray-400 transition-colors"
