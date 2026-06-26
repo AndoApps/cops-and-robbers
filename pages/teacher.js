@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+javascriptimport { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { generateGameCode, COLS, ROWS, SYMBOLS, ACTION_SYMBOLS, formatDollars, shuffle, ALL_GRID_REFS } from '../lib/gameLogic'
 
 const TIP_OFF_COUNTDOWN = 12
 const DEFENCE_COUNTDOWN = 12
+
+// Ordered list of symbols to show in the reference panel
+const DESCRIPTOR_ORDER = ['HEIST', 'ARREST', 'INSIDE_JOB', 'SWITCHEROO', 'TIP_OFF', 'BULLETPROOF', 'FRAME_JOB', 'CRIME_SPREE', 'VAULT']
 
 export default function Teacher() {
   const [authed, setAuthed] = useState(false)
@@ -410,6 +413,9 @@ export default function Teacher() {
   const nextButtonDisabled = actionsBox.length > 0 || pickNextBoxRef.current.length > 0 || phase === 'paused'
   const allCalled = calledRefs.length >= 49
 
+  // Determine which symbol is currently "lit up" — the one being actioned right now
+  const litSymbol = activeAction ? activeAction.symbol : null
+
   if (!authed) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={{ background: '#0a0a0f' }}>
@@ -498,30 +504,59 @@ export default function Teacher() {
       </div>
 
       <div className="grid gap-3" style={{ gridTemplateColumns: '2fr 1fr 1fr' }}>
-        <div className="rounded-xl p-2" style={{ background: '#111', border: '1px solid #333' }}>
-          <p className="text-xs text-gray-600 tracking-widest mb-1">GRID</p>
-          <div className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
-            <div />
-            {COLS.map(c => <div key={c} className="text-center text-gray-500 font-bold" style={{ fontSize: '9px' }}>{c}</div>)}
+        {/* BIG GRID + DESCRIPTOR PANEL BELOW IT */}
+        <div className="flex flex-col gap-2">
+          <div className="rounded-xl p-2" style={{ background: '#111', border: '1px solid #333' }}>
+            <p className="text-xs text-gray-600 tracking-widest mb-1">GRID</p>
+            <div className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
+              <div />
+              {COLS.map(c => <div key={c} className="text-center text-gray-500 font-bold" style={{ fontSize: '9px' }}>{c}</div>)}
+            </div>
+            {ROWS.map(row => (
+              <div key={row} className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
+                <div className="text-gray-500 font-bold flex items-center justify-center" style={{ fontSize: '9px' }}>{row}</div>
+                {COLS.map(col => {
+                  const ref = `${col}${row}`
+                  const called = calledRefs.includes(ref)
+                  const isCurrent = ref === currentRef
+                  return (
+                    <div key={ref} className="rounded flex items-center justify-center font-bold transition-all"
+                      style={{ aspectRatio: '1', background: isCurrent ? '#fbbf24' : called ? '#1a1a1a' : '#1a1a2e', color: isCurrent ? '#000' : called ? '#333' : '#666', border: isCurrent ? '2px solid #fbbf24' : '1px solid #222', fontSize: '8px' }}>
+                      {ref}
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
           </div>
-          {ROWS.map(row => (
-            <div key={row} className="grid grid-cols-8" style={{ gap: '2px', marginBottom: '2px' }}>
-              <div className="text-gray-500 font-bold flex items-center justify-center" style={{ fontSize: '9px' }}>{row}</div>
-              {COLS.map(col => {
-                const ref = `${col}${row}`
-                const called = calledRefs.includes(ref)
-                const isCurrent = ref === currentRef
+
+          {/* DESCRIPTOR REFERENCE PANEL */}
+          <div className="rounded-xl p-3" style={{ background: '#111', border: '1px solid #333' }}>
+            <p className="text-xs text-gray-600 tracking-widest mb-2">SYMBOL GUIDE</p>
+            <div className="grid grid-cols-3 gap-2">
+              {DESCRIPTOR_ORDER.map(symId => {
+                const sym = SYMBOLS[symId]
+                const isLit = litSymbol === symId
                 return (
-                  <div key={ref} className="rounded flex items-center justify-center font-bold transition-all"
-                    style={{ aspectRatio: '1', background: isCurrent ? '#fbbf24' : called ? '#1a1a1a' : '#1a1a2e', color: isCurrent ? '#000' : called ? '#333' : '#666', border: isCurrent ? '2px solid #fbbf24' : '1px solid #222', fontSize: '8px' }}>
-                    {ref}
+                  <div key={symId}
+                    className="rounded-lg px-2 py-2 transition-all duration-300"
+                    style={{
+                      background: isLit ? '#2a1a00' : '#1a1a2e',
+                      border: isLit ? '2px solid #fbbf24' : '1px solid #333',
+                      boxShadow: isLit ? '0 0 16px #fbbf2466' : 'none',
+                    }}>
+                    <p className="flex items-center gap-1" style={{ fontSize: '11px', fontWeight: isLit ? 800 : 600, color: isLit ? '#fbbf24' : '#9ca3af' }}>
+                      <span style={{ fontSize: '14px' }}>{sym.icon}</span> {sym.name}
+                    </p>
+                    <p style={{ fontSize: '10px', color: isLit ? '#fde68a' : '#555', marginTop: '2px' }}>{sym.description}</p>
                   </div>
                 )
               })}
             </div>
-          ))}
+          </div>
         </div>
 
+        {/* CONTROLS */}
         <div className="flex flex-col gap-3">
           <div className="rounded-xl p-4 text-center" style={{ background: '#111', border: '1px solid #333' }}>
             <p className="text-xs text-gray-600 tracking-widest mb-1">CURRENT SQUARE</p>
@@ -551,6 +586,7 @@ export default function Teacher() {
           )}
         </div>
 
+        {/* ACTIONS + PICK NEXT + STUDENTS */}
         <div className="flex flex-col gap-3">
           <div className="rounded-xl p-3" style={{ background: '#111', border: '1px solid #ef4444' }}>
             <p className="text-xs tracking-widest mb-2" style={{ color: '#ef4444' }}>ACTIONS BOX</p>
