@@ -143,6 +143,9 @@ export default function Student() {
     setTimeout(() => setPodiumReveal(3), 9000)
   }
 
+  // ============================================================
+  // DRAG AND DROP — icons only come from tray; dollars get auto-filled
+  // ============================================================
   const handleDragStartTray = (idx) => {
     if (isCuffed) return
     setDragging({ source: 'tray', index: idx })
@@ -150,6 +153,7 @@ export default function Student() {
 
   const handleDragStartGrid = (idx) => {
     if (isCuffed || !grid[idx]) return
+    // Only allow re-dragging icons around the grid, not auto-filled dollar cells
     if (grid[idx].type !== 'symbol') return
     setDragging({ source: 'grid', index: idx })
   }
@@ -163,18 +167,21 @@ export default function Student() {
       const item = newTray[dragging.index]
       const existing = newGrid[targetIdx]
       if (existing) {
-        if (existing.type === 'symbol') {
-          newTray[dragging.index] = existing
-        } else {
-          return
-        }
+        // Swap whatever is currently in that grid cell back into the tray
+        newTray[dragging.index] = existing
       } else {
         newTray.splice(dragging.index, 1)
       }
       newGrid[targetIdx] = item
+
+      // If we just placed the very last icon, top up the tray with shuffled dollar amounts
+      const stillHasIcons = newTray.some(t => t.type === 'symbol')
+      const dollarsAlreadyAdded = newTray.some(t => t.type === 'points') || newGrid.some(c => c && c.type === 'points')
+      if (!stillHasIcons && !dollarsAlreadyAdded) {
+        newTray.push(...shuffle([...DOLLAR_ITEMS]))
+      }
     } else if (dragging.source === 'grid') {
-      const targetCell = newGrid[targetIdx]
-      if (targetCell && targetCell.type !== 'symbol') return
+      // Swap any two grid cells freely
       const temp = newGrid[targetIdx]
       newGrid[targetIdx] = newGrid[dragging.index]
       newGrid[dragging.index] = temp
@@ -188,7 +195,7 @@ export default function Student() {
   const handleDropOnTray = () => {
     if (!dragging || isCuffed || dragging.source !== 'grid') return
     const item = grid[dragging.index]
-    if (!item || item.type !== 'symbol') return
+    if (!item) return
     const newGrid = [...grid]
     const newTray = [...tray]
     newGrid[dragging.index] = null
@@ -198,20 +205,25 @@ export default function Student() {
     setDragging(null)
   }
 
-  const allIconsPlaced = tray.length === 0
+  const allIconsPlaced = !tray.some(t => t.type === 'symbol')
+  const iconsRemainingInTray = tray.filter(t => t.type === 'symbol').length
 
+  // Manual "Auto-fill" button — only relevant once icons are placed, fills any remaining empty cells with whatever dollar items are left in the tray
   const handleAutoFillDollars = () => {
-    if (isCuffed || !allIconsPlaced) return
+    if (isCuffed || iconsRemainingInTray > 0) return
+    const dollarsInTray = tray.filter(t => t.type === 'points')
+    if (dollarsInTray.length === 0) return
+
     const newGrid = [...grid]
-    const shuffledDollars = shuffle([...DOLLAR_ITEMS])
     let dIdx = 0
     for (let i = 0; i < newGrid.length; i++) {
-      if (newGrid[i] === null) {
-        newGrid[i] = shuffledDollars[dIdx]
+      if (newGrid[i] === null && dIdx < dollarsInTray.length) {
+        newGrid[i] = dollarsInTray[dIdx]
         dIdx++
       }
     }
     setGrid(newGrid)
+    setTray([]) // all dollar items have now been placed
   }
 
   const handleCuffIt = async () => {
@@ -248,6 +260,9 @@ export default function Student() {
     router.push('/')
   }
 
+  // ============================================================
+  // RENDER
+  // ============================================================
   if (phase === 'joining') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: '#0a0a0f' }}>
@@ -306,6 +321,7 @@ export default function Student() {
 
   return (
     <div className="min-h-screen flex flex-col p-3" style={{ background: '#0a0a0f', maxWidth: '500px', margin: '0 auto' }}>
+      {/* Header */}
       <div className="flex justify-between items-center mb-2">
         <div>
           <p className="text-xs text-gray-600 tracking-widest">PLAYING AS</p>
@@ -323,6 +339,7 @@ export default function Student() {
         </div>
       </div>
 
+      {/* Notification */}
       {notification && (
         <div className="rounded-xl p-4 mb-2 animate-bounce-in" style={{ background: '#1a1a2e', border: `2px solid ${notification.isDefencePrompt ? '#ef4444' : '#374151'}` }}>
           <p className="text-sm text-center mb-3">{notification.message}</p>
@@ -349,6 +366,7 @@ export default function Student() {
         </div>
       )}
 
+      {/* GRID */}
       <div className="mb-2">
         <div className="grid grid-cols-8 gap-1 mb-1">
           <div />
@@ -400,11 +418,16 @@ export default function Student() {
         ))}
       </div>
 
+      {/* TRAY — icons first, then dollar amounts once all icons are placed */}
       {(phase === 'setup' || phase === 'waiting') && !isCuffed && (
         <div className="mb-2">
           <div className="flex justify-between items-center mb-1">
             <p className="text-xs text-gray-600 tracking-widest">
-              {allIconsPlaced ? '✅ ALL ICONS PLACED' : `DRAG ICONS TO GRID (${ICON_ITEMS.length - tray.length}/${ICON_ITEMS.length})`}
+              {!allIconsPlaced
+                ? `DRAG ICONS TO GRID (${ICON_ITEMS.length - iconsRemainingInTray}/${ICON_ITEMS.length})`
+                : tray.length > 0
+                  ? `DRAG $ AMOUNTS TO GRID (${gridFilled}/49)`
+                  : '✅ GRID COMPLETE'}
             </p>
           </div>
           <div
@@ -417,23 +440,29 @@ export default function Student() {
               <div
                 key={i}
                 className="rounded-lg flex flex-col items-center justify-center cursor-grab select-none"
-                style={{ width: '64px', height: '64px', background: '#1a1a2e', border: '2px solid #fbbf24', flexShrink: 0 }}
+                style={{ width: '64px', height: '64px', background: '#1a1a2e', border: `2px solid ${item.type === 'symbol' ? '#fbbf24' : '#22c55e'}`, flexShrink: 0 }}
                 draggable
                 onDragStart={() => handleDragStartTray(i)}
               >
-                <span style={{ fontSize: '26px', lineHeight: 1 }}>{SYMBOLS[item.value]?.icon}</span>
-                <span style={{ fontSize: '8px', color: '#fbbf24', marginTop: '2px', lineHeight: 1, fontWeight: 700 }}>{SHORT_LABELS[item.value]}</span>
+                {item.type === 'symbol' ? (
+                  <>
+                    <span style={{ fontSize: '26px', lineHeight: 1 }}>{SYMBOLS[item.value]?.icon}</span>
+                    <span style={{ fontSize: '8px', color: '#fbbf24', marginTop: '2px', lineHeight: 1, fontWeight: 700 }}>{SHORT_LABELS[item.value]}</span>
+                  </>
+                ) : (
+                  <span className="font-bold" style={{ color: '#22c55e', fontSize: '14px' }}>${item.value >= 1000 ? `${item.value / 1000}K` : item.value}</span>
+                )}
               </div>
             ))}
-            {tray.length === 0 && (
-              <p className="text-green-500 text-xs p-2 font-bold">🎉 Now fill the rest with dollar amounts!</p>
+            {tray.length === 0 && allIconsPlaced && (
+              <p className="text-green-500 text-xs p-2 font-bold">🎉 Grid complete! Ready to cuff in!</p>
             )}
           </div>
 
-          {allIconsPlaced && gridFilled < 49 && (
+          {allIconsPlaced && tray.length > 0 && (
             <button onClick={handleAutoFillDollars} className="w-full py-3 rounded-xl font-bold tracking-wider mt-2"
               style={{ background: '#1a1a2e', border: '2px solid #22c55e', color: '#22c55e' }}>
-              💵 AUTO-FILL DOLLAR AMOUNTS
+              💵 AUTO-FILL REMAINING DOLLAR AMOUNTS
             </button>
           )}
 
@@ -459,6 +488,7 @@ export default function Student() {
         </div>
       )}
 
+      {/* Bottom stats */}
       <div className="grid grid-cols-4 gap-2">
         <div className="rounded-xl p-2 text-center" style={{ background: '#111', border: '1px solid #333' }}>
           <p className="text-xs text-gray-600 mb-1">🏦 BANK</p>
